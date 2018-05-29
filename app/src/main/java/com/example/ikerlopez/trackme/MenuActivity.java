@@ -48,6 +48,8 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.maps.model.TileOverlay;
+import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -58,12 +60,16 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.iid.FirebaseInstanceId;
+import com.google.maps.android.heatmaps.HeatmapTileProvider;
 
 import java.text.DateFormat;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class MenuActivity extends AppCompatActivity
@@ -85,12 +91,13 @@ public class MenuActivity extends AppCompatActivity
     LocationSettingsRequest mLocationSettingsRequest;
 
     FirebaseDatabase database = FirebaseDatabase.getInstance();
-    DatabaseReference rutasRef = database.getReference("rutas");
     DatabaseReference puntosRef = database.getReference("puntos");
     //Pruebas
     DatabaseReference endedRoutes = database.getReference("endedRoutes");
+    List<LatLng> heatMapPoints = new ArrayList<>();
     //
     ValueEventListener portaRutas;
+    ValueEventListener heatMapPointsListener;
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
 
@@ -174,6 +181,25 @@ public class MenuActivity extends AppCompatActivity
                 Log.e("TRAER RUTA",databaseError.getMessage());
             }
         };
+        heatMapPointsListener = new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                for(DataSnapshot postSnapshot: dataSnapshot.getChildren()) {
+                    UserLocation userLocation = postSnapshot.getValue(UserLocation.class);
+                    double lat = userLocation.getLatitud();
+                    double lng = userLocation.getLongitude();
+                    heatMapPoints.add(new LatLng(lat,lng));
+                }
+                addHeatMap();
+            }
+
+            @Override
+            public void onCancelled(DatabaseError databaseError) {
+                Toast.makeText(getApplicationContext(),"Error al traer puntos",Toast.LENGTH_SHORT).show();
+                Log.e("Traer PUNTOS",databaseError.getMessage());
+            }
+        };
+
 
 
     }
@@ -225,11 +251,22 @@ public class MenuActivity extends AppCompatActivity
                 getPreviousRoutes();
             }
         } else if (id == R.id.nav_settings) {
-            Toast.makeText(this,"Pendiente de implementar",Toast.LENGTH_SHORT).show();
+            Toast.makeText(this,"Pendiente de implementación",Toast.LENGTH_SHORT).show();
+//            Toast.makeText(this,"Creando puntos",Toast.LENGTH_SHORT).show();
+//            try {
+//                simularMapaDeCalor();
+//                Toast.makeText(this,"Puntos creados",Toast.LENGTH_SHORT).show();
+//            } catch (ParseException e) {
+//                e.printStackTrace();
+//                Toast.makeText(this,"Algo fue mal...",Toast.LENGTH_SHORT).show();
+//            }
+
         } else if (id == R.id.nav_notifications) {
             Toast.makeText(this,"Llega una notificación al terminar una ruta",Toast.LENGTH_SHORT).show();
         } else if (id == R.id.nav_heat_map) {
-            Toast.makeText(this,"Pendiente de implementar",Toast.LENGTH_SHORT).show();
+            puntosRef.addListenerForSingleValueEvent(heatMapPointsListener);
+
+
         } else if (id == R.id.nav_clear) {
             mMap.clear();
             Toast.makeText(this,"Mapa limpiado",Toast.LENGTH_SHORT).show();
@@ -386,7 +423,9 @@ public class MenuActivity extends AppCompatActivity
         userLocation.setIndex(index);
         userLocation.setLatitud(location.getLatitude());
         userLocation.setLongitude(location.getLongitude());
-        userLocation.setTime(DateFormat.getDateTimeInstance().format(new Date()));
+        Date dateTime = Calendar.getInstance().getTime();
+        userLocation.setDate(new SimpleDateFormat("dd/MM/yyyy",Locale.getDefault()).format(dateTime));
+        userLocation.setTime(new SimpleDateFormat("HH:mm:ss",Locale.getDefault()).format(dateTime));
         puntosRef.push().setValue(userLocation);
     }
 
@@ -422,7 +461,7 @@ public class MenuActivity extends AppCompatActivity
                             // for ActivityCompat#requestPermissions for more details.
                             return;
                         }
-                        idruta = rutasRef.push().getKey();
+                        idruta = puntosRef.push().getKey();
                         index = 0;
                         Ruta ruta = new Ruta(idruta,name);
                         Toast.makeText(getApplicationContext(),"Traking iniciado",Toast.LENGTH_SHORT).show();
@@ -465,6 +504,45 @@ public class MenuActivity extends AppCompatActivity
             fab.setImageResource(R.drawable.ic_human_male);
             traking = true;
         }
+    }
+
+    public void simularMapaDeCalor() throws ParseException {
+        int cont = 0;
+        double m;
+        double rangoLat [] = {40.387025,40.390719};
+        double rangoLng [] = {-3.630291,-3.626127};
+        for(int i = 0; i < 30; i ++){
+            m = (double) i/1000;
+            rangoLat  = new double[]{40.406214-m, 40.420720+m};
+            rangoLng  = new double[]{-3.686641-m, -3.679493+m};
+            idruta = puntosRef.push().getKey();
+            for(int j = 1; j <= 10; j++){
+                UserLocation userLocation = new UserLocation();
+                userLocation.setIdruta(idruta);
+                userLocation.setIndex(j);
+                double lat = rangoLat[0] + Math.random() * (rangoLat[1] - rangoLat[0]);
+                double lng = rangoLng[0] + Math.random() * (rangoLng[1] - rangoLng[0]);
+                userLocation.setLatitud(lat);
+                userLocation.setLongitude(lng);
+                Date dateTime = Calendar.getInstance().getTime();
+                userLocation.setDate(new SimpleDateFormat("dd/MM/yyyy",Locale.getDefault()).format(dateTime));
+                String time = "10:10:" + (1+j)*5;
+                SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss",Locale.getDefault());
+                userLocation.setTime(sdf.format(sdf.parse(time)));
+                //puntosRef.push().setValue(userLocation);
+                cont++;
+                Log.d("PUNTOS","Punto: " + cont);
+                heatMapPoints.add(new LatLng(lat,lng));
+            }
+        }
+    }
+
+    public void addHeatMap(){
+        HeatmapTileProvider mProvider = new HeatmapTileProvider.Builder()
+                .data(heatMapPoints).build();
+        TileOverlay mOverlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(mProvider));
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(heatMapPoints.get(heatMapPoints.size()-1)));
+        Toast.makeText(this,"Mapa de calor creado",Toast.LENGTH_SHORT).show();
     }
 
 }

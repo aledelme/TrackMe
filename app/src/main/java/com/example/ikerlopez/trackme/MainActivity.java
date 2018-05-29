@@ -257,7 +257,7 @@ public class MainActivity extends AppCompatActivity {
                 firebaseAuthWithGoogle(account);
             } else {
                 Toast.makeText(this,"Error al autenticar",Toast.LENGTH_SHORT).show();
-                Log.e("AUTENTICACION",result.getStatus().getStatusMessage());
+                Log.e("AUTENTICACION",result.getStatus().toString());
                 // Google Sign In failed, update UI appropriately
                 // ...
             }

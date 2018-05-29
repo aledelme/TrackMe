@@ -10,6 +10,7 @@ public class UserLocation {
     private int index;
     private double latitud;
     private double longitude;
+    private String date;
     private String time;
 
     public UserLocation(){
@@ -53,5 +54,13 @@ public class UserLocation {
 
     public void setTime(String time) {
         this.time = time;
+    }
+
+    public String getDate() {
+        return date;
+    }
+
+    public void setDate(String date) {
+        this.date = date;
     }
 }
